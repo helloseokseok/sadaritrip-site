@@ -1,0 +1,6 @@
+{
+  // sadaritrip.com 사이트 — dist 폴더를 그대로 정적 파일로 배포해요.
+  "name": "sadaritrip",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist" }
+}
