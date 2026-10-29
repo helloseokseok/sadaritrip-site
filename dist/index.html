@@ -126,6 +126,10 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 @keyframes flapOpen { to { transform: rotateX(180deg); opacity: .4; } }
 @keyframes sealOff { to { transform: translateX(-50%) scale(0); opacity: 0; } }
 @keyframes envLift { 60% { transform: translateY(-6px); } 100% { transform: translateY(-6px); opacity: 0; } }
+.dates { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; }
+.dates label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--sub); }
+.dates input { padding: 0 10px; font-size: 15px; }
+.dates .tilde { padding-bottom: 14px; color: var(--sub); font-weight: 700; }
 .money { display: flex; align-items: center; gap: 10px; }
 .money input { flex: 1; min-width: 0; min-height: 52px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 14px; font: inherit; font-size: 20px; font-weight: 700; padding: 0 14px; text-align: right; }
 .money span { font-size: 17px; font-weight: 700; }
@@ -143,10 +147,11 @@ const BANDS = {
   해외: [['b1', '50만원 이하', 0, 500000], ['b2', '50~100만원', 500000, 1000000], ['b3', '100~150만원', 1000000, 1500000], ['b4', '150만원 이상', 1500000, 1e9]],
 };
 const THEMES = ['전체', '휴양', '도시', '미식'];
-const st = { step: 'pick', region: '국내', band: '', budget: 0, date: '', theme: '전체', cands: [], off: -1, rungs: [], start: -1, order: [], hit: -1, seed: '', running: false, codeOpen: false, friend: false };
+const st = { step: 'pick', region: '국내', band: '', budget: 0, end: '', date: '', theme: '전체', cands: [], off: -1, rungs: [], start: -1, order: [], hit: -1, seed: '', running: false, codeOpen: false, friend: false };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const man = n => (n >= 10000 ? Math.round(n / 10000).toLocaleString('ko-KR') + '만' : n.toLocaleString('ko-KR')) + '원';
 const store = { get(k, d) { try { const v = localStorage.getItem('sadari:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('sadari:' + k, JSON.stringify(v)); } catch (e) {} } };
+const addDay = (ymd, k) => { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + k); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 function rng(seed) { let h = 2166136261; for (const ch of seed) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; }; }
 const isAny = () => st.region === '아무 데나';
@@ -155,7 +160,7 @@ const bandLabel = () => isAny() ? '예산 상관없이' : st.band ? ((BANDS[st.r
 const capOf = () => { if (isAny()) return 0; if (st.band) { const b = BANDS[st.region].find(x => x[0] === st.band); return b && b[3] < 1e9 ? b[3] : 0; } return st.budget || 0; };
 function pool() {
   if (isAny()) return DEST.filter(d => st.theme === '전체' || (d.themes || []).includes(st.theme));
-  if (!st.band) return st.budget ? DEST.filter(d => d.region === st.region && d.costMin <= st.budget && (st.theme === '전체' || (d.themes || []).includes(st.theme))) : [];
+  if (!st.band) return st.budget ? DEST.filter(d => d.region === st.region && cMin(d) <= st.budget && (st.theme === '전체' || (d.themes || []).includes(st.theme))) : [];
   const b = BANDS[st.region].find(x => x[0] === st.band); if (!b) return [];
   return DEST.filter(d => d.region === st.region && d.costMin < b[3] && d.costMax >= b[2] && (st.theme === '전체' || (d.themes || []).includes(st.theme)));
 }
@@ -164,10 +169,10 @@ function bandCount(region, band) { const save = [st.region, st.band]; st.region 
 function stretchPool() {
   const cap = capOf(); if (!cap) return [];
   const inP = new Set(pool().map(d => d.id));
-  const up = DEST.filter(d => d.region === st.region && !inP.has(d.id) && d.costMin > cap && (st.theme === '전체' || (d.themes || []).includes(st.theme))).sort((x, y) => x.costMin - y.costMin);
-  return up.filter(d => d.costMin <= cap * 1.2);
+  const up = DEST.filter(d => d.region === st.region && !inP.has(d.id) && cMin(d) > cap && (st.theme === '전체' || (d.themes || []).includes(st.theme))).sort((x, y) => cMin(x) - cMin(y));
+  return up.filter(d => cMin(d) <= cap * 1.2);
 }
-const overBy = d => { const cap = capOf(); return cap && d.costMin > cap ? d.costMin - cap : 0; };
+const overBy = d => { const cap = capOf(); return cap && cMin(d) > cap ? cMin(d) - cap : 0; };
 function draw(seed) {
   const p = pool(); st.seed = seed || (Math.random().toString(16).slice(2) + '00000000').slice(0, 8); const r = rng(st.seed);
   const a = p.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -178,18 +183,20 @@ function draw(seed) {
   } else st.cands = a.slice(0, 5);
   st.off = -1;
 }
-function codeOf() { const t = THEMES.indexOf(st.theme); if (!isAny() && !st.band) return `${st.region === '국내' ? 'K' : 'H'}${Math.round(st.budget / 10000)}M${t < 0 ? 0 : t}${st.off >= 0 ? st.off + 1 : 0}-${st.date.replace(/-/g, '').slice(2)}-${st.seed}`; return `${isAny() ? 'A' : st.region === '국내' ? 'K' : 'H'}${isAny() ? 0 : st.band.slice(1)}${t < 0 ? 0 : t}${st.off >= 0 ? st.off + 1 : 0}-${st.date.replace(/-/g, '').slice(2)}-${st.seed}`; }
+function codeOf() { const t = THEMES.indexOf(st.theme); if (!isAny() && !st.band) return `${st.region === '국내' ? 'K' : 'H'}${Math.round(st.budget / 10000)}M${nightsSel() ? nightsSel() + 'N' : ''}${t < 0 ? 0 : t}${st.off >= 0 ? st.off + 1 : 0}-${st.date.replace(/-/g, '').slice(2)}-${st.seed}`; return `${isAny() ? 'A' : st.region === '국내' ? 'K' : 'H'}${isAny() ? 0 : st.band.slice(1)}${t < 0 ? 0 : t}${st.off >= 0 ? st.off + 1 : 0}-${st.date.replace(/-/g, '').slice(2)}-${st.seed}`; }
 function applyCode(raw) {
-  const raw2 = String(raw || '').trim().toUpperCase(), n = raw2.match(/^([KH])(\d{1,4})M([0-3])([0-5])-(\d{6})-([0-9A-F]{8})$/);
-  const m = n || raw2.match(/^([KHA])([0-4])([0-3])([0-5])-(\d{6})-([0-9A-F]{8})$/);
-  if (!m) return false;
-  if (n) { if (+n[2] < 1) return false; st.region = n[1] === 'K' ? '국내' : '해외'; st.band = ''; st.budget = +n[2] * 10000; }
-  else { st.region = m[1] === 'K' ? '국내' : m[1] === 'A' ? '아무 데나' : '해외'; st.band = m[1] === 'A' ? '' : 'b' + m[2]; if (m[1] !== 'A' && m[2] === '0') return false; }
-  st.theme = THEMES[+m[3]];
-  st.date = '20' + m[5].slice(0, 2) + '-' + m[5].slice(2, 4) + '-' + m[5].slice(4, 6);
+  const raw2 = String(raw || '').trim().toUpperCase();
+  const n = raw2.match(/^([KH])(\d{1,4})M(?:(\d{1,2})N)?([0-3])([0-5])-(\d{6})-([0-9A-F]{8})$/), o = raw2.match(/^([KHA])([0-4])([0-3])([0-5])-(\d{6})-([0-9A-F]{8})$/);
+  let th, off, ymd, seed, nights = 0;
+  if (n) { if (+n[2] < 1) return false; st.region = n[1] === 'K' ? '국내' : '해외'; st.band = ''; st.budget = +n[2] * 10000; nights = +(n[3] || 0); th = n[4]; off = n[5]; ymd = n[6]; seed = n[7]; }
+  else if (o) { st.region = o[1] === 'K' ? '국내' : o[1] === 'A' ? '아무 데나' : '해외'; st.band = o[1] === 'A' ? '' : 'b' + o[2]; if (o[1] !== 'A' && o[2] === '0') return false; th = o[3]; off = o[4]; ymd = o[5]; seed = o[6]; }
+  else return false;
+  st.theme = THEMES[+th];
+  st.date = '20' + ymd.slice(0, 2) + '-' + ymd.slice(2, 4) + '-' + ymd.slice(4, 6);
+  st.end = ''; if (nights > 0) { const e = new Date(st.date + 'T00:00:00'); e.setDate(e.getDate() + nights); e.setMinutes(e.getMinutes() - e.getTimezoneOffset()); st.end = e.toISOString().slice(0, 10); }
   if (pool().length < 2) return false;
-  draw(m[6].toLowerCase()); const off = +m[4] - 1;
-  st.off = off >= 0 && off < st.cands.length && st.cands.length >= 3 ? off : -1;
+  draw(seed.toLowerCase()); const k = +off - 1;
+  st.off = k >= 0 && k < st.cands.length && st.cands.length >= 3 ? k : -1;
   st.friend = true; startLadder(); return true;
 }
 // 비밀 봉투(승인 trip-2026-10-28-2): 결과를 봉투에 넣고 출발 날 열어요. 봉투 코드 = 친구 코드 + 출발 번호
@@ -200,7 +207,7 @@ function envHints(d) {
   return [['예산', isAny() ? '예산 상관없이' : bandLabel()], ['기간', nightLabel(d)], ['테마', (d.themes || []).join('·')]];
 }
 function applyEnv(raw) {
-  const m = String(raw || '').trim().toUpperCase().match(/^((?:[KHA][0-4][0-3][0-5]|[KH]\d{1,4}M[0-3][0-5])-\d{6}-[0-9A-F]{8})-([1-5])$/);
+  const m = String(raw || '').trim().toUpperCase().match(/^((?:[KHA][0-4][0-3][0-5]|[KH]\d{1,4}M(?:\d{1,2}N)?[0-3][0-5])-\d{6}-[0-9A-F]{8})-([1-5])$/);
   if (!m) return false;
   const keep = st.friend;
   if (!applyCode(m[1])) { st.friend = keep; return false; }
@@ -230,23 +237,44 @@ function openEnv(peek) {
   if (!c || reduce) return go('result');
   c.classList.add('opening'); setTimeout(() => go('result'), 720);
 }
-const nightLabel = d => d.region === '국내' ? `${d.nights}박 ${d.nights + 1}일` : `${d.nights}박 ${d.nights + 1}일`;
+// 기간(제니 님 2026-10-30 '몇박몇일은 출발날짜~도착날짜로 달력에서 선택'): 고른 박수에 맞춰 숙박은 박수만큼, 식비·현지교통은 날수만큼 늘리거나 줄여 셈해요(추정).
+// 각 여행지 basis의 '숙박 …원', '식비 …원', '현지교통 …원' 항목을 읽어 나누고, 나머지(교통 왕복 등)는 그대로 둬요. 못 읽으면 날수 비율로 셈해요.
+const nightsSel = () => st.date && st.end ? Math.round((new Date(st.end + 'T00:00:00') - new Date(st.date + 'T00:00:00')) / 86400000) : 0;
+const amt0 = t => { const m = String(t).match(/([\d.,]+)(?:~([\d.,]+))?(만원|원)/); if (!m) return null; const k = m[3] === '만원' ? 10000 : 1, f = x => parseFloat(x.replace(/,/g, '')) * k; return [f(m[1]), f(m[2] || m[1])]; };
+const PARTS = {};
+function parts(d) {
+  if (d.id in PARTS) return PARTS[d.id];
+  let stay = null; const day = [0, 0];
+  String(d.basis || '').split(' + ').forEach(t => { t = t.trim(); const a = amt0(t); if (!a) return; if (/^숙박/.test(t)) stay = a; else if (/^(식비|현지교통)/.test(t)) { day[0] += a[0]; day[1] += a[1]; } });
+  const fx = stay && day[0] > 0 ? [d.costMin - stay[0] - day[0], d.costMax - stay[1] - day[1]] : null;
+  return PARTS[d.id] = fx && fx[0] >= 0 && fx[1] >= 0 ? { stay, day, fx } : null;
+}
+const r10k = x => Math.round(x / 10000) * 10000;
+function costOf(d) {
+  const N = nightsSel(), base = d.nights || 1; if (!N || N === base) return [d.costMin, d.costMax];
+  const p = parts(d);
+  if (!p) { const k = (N + 1) / (base + 1); return [r10k(d.costMin * k), r10k(d.costMax * k)]; }
+  return [0, 1].map(i => r10k(p.fx[i] + p.stay[i] * N / base + p.day[i] * (N + 1) / (base + 1)));
+}
+const cMin = d => costOf(d)[0];
+const nightLabel = d => { const n = nightsSel() || d.nights; return `${n}박 ${n + 1}일`; };
 function pickFoot() {
-  const n = pool().length, ready = st.budget > 0 && st.date && n >= 2;
-  const mins = DEST.filter(d => d.region === st.region && (st.theme === '전체' || (d.themes || []).includes(st.theme))).map(d => d.costMin).sort((a, b) => a - b);
-  return `<div class="sum"><span>${esc(st.region)} · ${esc(bandLabel())} · ${st.date ? esc(st.date.slice(5).replace('-', '/')) : '날짜 미선택'} · ${esc(st.theme)}</span><b>${st.budget ? `후보 ${Math.min(5, n)}곳` : ''}</b></div>
+  const n = pool().length, N = nightsSel(), ready = st.budget > 0 && st.date && N > 0 && n >= 2;
+  const mins = DEST.filter(d => d.region === st.region && (st.theme === '전체' || (d.themes || []).includes(st.theme))).map(cMin).sort((a, b) => a - b);
+  return `<div class="sum"><span>${esc(st.region)} · ${esc(bandLabel())} · ${st.date && N > 0 ? `${esc(st.date.slice(5).replace('-', '/'))}~${esc(st.end.slice(5).replace('-', '/'))} ${N}박` : '날짜 미선택'} · ${esc(st.theme)}</span><b>${st.budget ? `후보 ${Math.min(5, n)}곳` : ''}</b></div>
   ${st.budget && n < 2 && mins.length >= 2 ? `<p class="note">이 금액으론 갈 수 있는 곳이 부족해요. ${esc(st.region)}${st.theme === '전체' ? '' : '·' + esc(st.theme)}은 1인 약 ${man(mins[1])}부터 사다리를 탈 수 있어요.</p>` : ''}
   <button class="cta" data-ladder ${ready ? '' : 'disabled'}>사다리 타기</button>`;
 }
 function viewPick() {
   return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1><p class="lead">국내·해외와 1인 예산을 적고 사다리를 타면, 그 금액으로 갈 수 있는 여행지 5곳 중 한 곳이 정해져요.</p></div>
-  <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}<small>${r === '국내' ? '1박 2일' : '3~4박'}</small></button>`).join('')}</div></div>
+  <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}</button>`).join('')}</div></div>
   <div class="grp"><h2>1인 예산은?</h2><label class="money"><input id="budget" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="${st.region === '국내' ? '예: 20' : '예: 80'}" value="${st.budget ? st.budget / 10000 : ''}" aria-label="1인 예산(만원 단위)"><span>만원</span></label>
     <p class="note">교통·숙박(2인 1실 기준 1인 몫)·식비를 더한 추정치로 이 금액 안에서 갈 수 있는 곳을 골라요. 실제 가격은 날짜에 따라 달라요.</p></div>
-  <div class="grp"><h2>언제 출발?</h2><input type="date" id="date" min="${today()}" value="${esc(st.date)}" aria-label="출발 날짜"></div>
+  <div class="grp"><h2>언제 가요?</h2><div class="dates"><label><span>가는 날</span><input type="date" id="date" min="${today()}" value="${esc(st.date)}" aria-label="가는 날"></label><span class="tilde" aria-hidden="true">~</span><label><span>오는 날</span><input type="date" id="end" min="${esc(st.date ? addDay(st.date, 1) : addDay(today(), 1))}" value="${esc(st.end)}" aria-label="오는 날"></label></div>
+    ${nightsSel() > 0 ? `<p class="note"><b style="color:var(--ink)">${nightsSel()}박 ${nightsSel() + 1}일</b> 기준으로 비용을 셈해요.</p>` : ''}</div>
   <div class="grp"><h2>테마 <span style="font-weight:500;color:var(--sub);font-size:13px">(선택)</span></h2><div class="seg c4">${THEMES.map(t => `<button class="opt" data-theme="${t}" aria-pressed="${st.theme === t}">${t}</button>`).join('')}</div></div>
   <div class="foot"><div class="foot" id="pickfoot" style="margin-top:0">${pickFoot()}</div>
-  ${st.codeOpen ? `<div class="codebox"><input id="code" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="예: K30M00-261114-a1b2c3d4" aria-label="친구에게 받은 사다리 코드"><button data-code>타기</button></div><p class="note">친구와 같은 후보·같은 사다리가 열려요. 봉투 코드를 넣으면 봉투가 열려요.</p>` : `<button class="linkb" data-codeopen>친구 코드로 같은 사다리 타기</button>`}</div>
+  </div>
   ${envList()}`;
 }
 function envList() {
@@ -256,7 +284,7 @@ function envList() {
 function viewCands() {
   const has = st.off >= 0, left = st.cands.length - (has ? 1 : 0);
   return `<div class="head"><span class="step">2 / 3 · 후보 확인</span><h1>${has ? `${left}곳으로 사다리를 타요` : `이 ${st.cands.length}곳 중 한 곳이에요`}</h1><p class="lead">${esc(st.region)} · ${esc(bandLabel())} · ${esc(st.date.slice(5).replace('-', '/'))} 출발 · ${esc(st.theme)}</p></div>
-  <div class="cands">${st.cands.map((d, i) => `<button class="cand ${i === st.off ? 'off' : ''}" data-off="${i}" aria-pressed="${i === st.off}" aria-label="${esc(d.name)} ${i === st.off ? '제외됨, 다시 넣기' : '빼기'}"><span class="no" aria-hidden="true">${i + 1}</span><span style="min-width:0"><b>${esc(d.name)}${d.region === '해외' ? ` <span style="font-weight:500;font-size:13px;color:var(--sub)">${esc(d.country)}</span>` : ''}</b><span class="meta">${overBy(d) ? `<em class="over">보너스 +${man(overBy(d))}</em> ` : ''}약 ${man(d.costMin)}~${man(d.costMax)} · ${nightLabel(d)} · ${esc((d.tags || []).join(' · '))}</span></span><span class="tag">${i === st.off ? '뺐어요' : '빼기'}</span></button>`).join('')}</div>
+  <div class="cands">${st.cands.map((d, i) => `<button class="cand ${i === st.off ? 'off' : ''}" data-off="${i}" aria-pressed="${i === st.off}" aria-label="${esc(d.name)} ${i === st.off ? '제외됨, 다시 넣기' : '빼기'}"><span class="no" aria-hidden="true">${i + 1}</span><span style="min-width:0"><b>${esc(d.name)}${d.region === '해외' ? ` <span style="font-weight:500;font-size:13px;color:var(--sub)">${esc(d.country)}</span>` : ''}</b><span class="meta">${overBy(d) ? `<em class="over">보너스 +${man(overBy(d))}</em> ` : ''}약 ${man(costOf(d)[0])}~${man(costOf(d)[1])} · ${nightLabel(d)} · ${esc((d.tags || []).join(' · '))}</span></span><span class="tag">${i === st.off ? '뺐어요' : '빼기'}</span></button>`).join('')}</div>
   ${st.cands.some(overBy) ? '<p class="note">후보 중 1곳은 예산보다 조금 더 드는 보너스 칸이에요. 베타에선 결제가 없어 차액은 본인 부담이에요. 정식 상품에선 차액을 앙리스크림이 내는 칸이에요.</p>' : ''}
   <div class="minus"><span><b>싫은 곳 1곳 빼기</b><br>카드를 누르면 빠져요. 다시 누르면 돌아와요.</span></div>
   <div class="foot"><button class="cta" data-go="ladder">${left}곳으로 사다리 타기</button><button class="linkb" data-reroll>후보 다시 뽑기</button><button class="linkb" data-go="pick">조건 바꾸기</button></div>`;
@@ -288,7 +316,7 @@ function viewLadder() {
     </svg>
     <div class="ends">${st.order.map((d, i) => `<div class="endc ${done && i === path.end ? 'hit' : ''}">${done ? esc(d.name) : '?'}</div>`).join('')}</div>
   </div>
-  <div class="foot">${done ? `<button class="cta" data-go="result">결과 보기</button>` : `<p class="note">${list.some(overBy) ? `${n}칸 중 1칸은 예산보다 조금 더 드는 보너스 칸이에요. ` : ''}${st.friend ? '친구와 같은 사다리예요. 다른 번호를 골라 보세요.' : `친구가 코드 ${esc(codeOf())}를 넣으면 같은 사다리가 열려요.`}</p>`}<button class="linkb" data-go="pick" ${st.running ? 'disabled' : ''}>조건 바꾸기</button></div>`;
+  <div class="foot">${done ? `<button class="cta" data-go="result">결과 보기</button>` : (list.some(overBy) ? `<p class="note">${n}칸 중 1칸은 예산보다 조금 더 드는 보너스 칸이에요.</p>` : '')}<button class="linkb" data-go="pick" ${st.running ? 'disabled' : ''}>조건 바꾸기</button></div>`;
 }
 function viewResult() {
   const d = st.order[st.hit];
@@ -298,12 +326,11 @@ function viewResult() {
   <div class="result">
     <div><span class="k">여행지</span><div class="big">${esc(d.name)}</div>${d.region === '해외' ? `<span class="k">${esc(d.country)}</span>` : ''}</div>
     <p class="pitch">${esc(d.pitch)}</p>
-    <div class="row"><div><span class="k">출발</span><b>${esc(st.date.replace(/-/g, '.'))}</b></div><div><span class="k">기간</span><b>${nightLabel(d)}</b></div><div><span class="k">1인 예상 비용</span><b>약 ${man(d.costMin)}~${man(d.costMax)}</b>${overBy(d) ? `<span class="k">보너스 칸에 걸렸어요! 예산보다 ${man(overBy(d))} 더 드는 곳</span>` : ''}</div><div><span class="k">테마</span><b>${esc((d.themes || []).join('·'))}</b></div></div>
+    <div class="row"><div><span class="k">${st.end ? '일정' : '출발'}</span><b>${esc(st.date.replace(/-/g, '.'))}${st.end ? ` ~ ${esc(st.end.slice(5).replace('-', '.'))}` : ''}</b></div><div><span class="k">기간</span><b>${nightLabel(d)}</b></div><div><span class="k">1인 예상 비용</span><b>약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}</b>${overBy(d) ? `<span class="k">보너스 칸에 걸렸어요! 예산보다 ${man(overBy(d))} 더 드는 곳</span>` : ''}</div><div><span class="k">테마</span><b>${esc((d.themes || []).join('·'))}</b></div></div>
     <div class="tags">${(d.tags || []).map(t => `<span>${esc(t)}</span>`).join('')}</div>
   </div>
-  <div class="basis"><b style="color:var(--ink)">비용은 이렇게 셈했어요</b><br>${esc(d.basis)}${d.asOf ? ` (기준 ${esc(d.asOf)})` : ''}${src.length ? `<br>출처: ${src.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || s.url)}</a>`).join(' · ')}` : ''}<br>실제 가격은 날짜·예약 시점에 따라 달라요. 베타라서 예약·결제는 아직 안 돼요.</div>
-  <div class="codeline"><span>같은 사다리 코드<br><b>${esc(codeOf())}</b></span><span style="text-align:right">친구가 첫 화면<br>'친구 코드'에 넣어요</span></div>
-  ${st.peeked ? '<p class="note">몰래 열었어요. 출발 날까지 동행에게는 비밀이에요.</p>' : ''}
+  <div class="basis"><b style="color:var(--ink)">비용은 이렇게 셈했어요</b><br>${esc(d.basis)}${d.asOf ? ` (기준 ${esc(d.asOf)})` : ''}${nightsSel() && nightsSel() !== d.nights ? `<br>위 셈은 ${d.nights}박 기준이에요. 고른 ${nightsSel()}박에 맞춰 숙박은 박수만큼, 식비·현지교통은 날수만큼 늘리거나 줄인 추정치예요.` : ''}${src.length ? `<br>출처: ${src.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || s.url)}</a>`).join(' · ')}` : ''}<br>실제 가격은 날짜·예약 시점에 따라 달라요. 베타라서 예약·결제는 아직 안 돼요.</div>
+    ${st.peeked ? '<p class="note">몰래 열었어요. 출발 날까지 동행에게는 비밀이에요.</p>' : ''}
   <button class="ghost" data-envmake>봉투에 넣기 · 출발 날 같이 열어요</button>
   <div class="two"><button class="ghost" data-share>결과 공유하기</button><button class="ghost" data-again>다시 뽑기</button></div>
   ${hist.length > 1 ? `<div class="hist"><h2>지난 사다리 결과</h2><ul>${hist.slice(1, 6).map(h => `<li>${esc(h.date)} · ${esc(h.name)} (${esc(h.region)})</li>`).join('')}</ul></div>` : ''}
@@ -371,7 +398,7 @@ document.addEventListener('click', e => {
   if (b.hasAttribute('data-share')) {
     const d = st.order[st.hit];
     const list = st.cands.filter((_, i) => i !== st.off);
-    const txt = `사다리가 정해 줬어요 → ${d.name}${d.region === '해외' ? `(${d.country})` : ''}\n${st.date.replace(/-/g, '.')} 출발 · ${nightLabel(d)} · 1인 약 ${man(d.costMin)}~${man(d.costMax)}(추정)\n후보 ${list.length}곳: ${list.map(x => x.name).join(' · ')}\n나랑 같은 사다리 타 볼래? 사다리트립 '친구 코드'에 ${codeOf()}`;
+    const txt = `사다리가 정해 줬어요 → ${d.name}${d.region === '해외' ? `(${d.country})` : ''}\n${st.date.replace(/-/g, '.')} 출발 · ${nightLabel(d)} · 1인 약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}(추정)\n후보 ${list.length}곳: ${list.map(x => x.name).join(' · ')}\nsadaritrip.com`;
     const done = () => toast('결과를 복사했어요');
     const copy = () => { try { navigator.clipboard.writeText(txt).then(done, () => { prompt0(txt); }); } catch (err) { prompt0(txt); } };
     if (navigator.share) { navigator.share({ title: '사다리트립 결과', text: txt }).catch(err => { if (!err || err.name !== 'AbortError') copy(); }); } else copy();
@@ -379,7 +406,10 @@ document.addEventListener('click', e => {
   }
 });
 function prompt0(txt, okMsg) { const ta = document.createElement('textarea'); ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); toast(ok ? (okMsg || '결과를 복사했어요') : '복사가 막혀 있어요. 화면을 캡처해 공유해 주세요'); }
-document.addEventListener('change', e => { if (e.target.id === 'date') { st.date = e.target.value; render(); } });
+document.addEventListener('change', e => {
+  if (e.target.id === 'date') { st.date = e.target.value; if (st.end && st.end <= st.date) st.end = ''; render(); }
+  if (e.target.id === 'end') { st.end = e.target.value; const N = nightsSel(); if (st.end && (N < 1 || N > 30)) { st.end = ''; toast(N < 1 ? '오는 날은 가는 날 다음 날부터 골라요' : '최대 30박까지 고를 수 있어요'); } render(); }
+});
 document.addEventListener('input', e => {
   if (e.target.id === 'date') { st.date = e.target.value; }
   if (e.target.id === 'budget') { const v = e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 4); if (v !== e.target.value) e.target.value = v; st.budget = v ? +v * 10000 : 0; const f = document.getElementById('pickfoot'); if (f) f.innerHTML = pickFoot(); }
