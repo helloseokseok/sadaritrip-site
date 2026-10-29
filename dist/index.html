@@ -126,6 +126,9 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 @keyframes flapOpen { to { transform: rotateX(180deg); opacity: .4; } }
 @keyframes sealOff { to { transform: translateX(-50%) scale(0); opacity: 0; } }
 @keyframes envLift { 60% { transform: translateY(-6px); } 100% { transform: translateY(-6px); opacity: 0; } }
+.howto { background: var(--fill); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--ink); line-height: 1.55; }
+.howto ol { margin: 0; padding-left: 18px; }
+.howto p { margin: 0; color: var(--sub); font-size: 12px; }
 .dates { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; }
 .dates label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--sub); }
 .dates input { padding: 0 10px; font-size: 15px; }
@@ -266,7 +269,8 @@ function pickFoot() {
   <button class="cta" data-ladder ${ready ? '' : 'disabled'}>사다리 타기</button>`;
 }
 function viewPick() {
-  return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1><p class="lead">국내·해외와 1인 예산을 적고 사다리를 타면, 그 금액으로 갈 수 있는 여행지 5곳 중 한 곳이 정해져요.</p></div>
+  return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1></div>
+  <div class="howto"><ol><li>국내·해외, 1인 예산, 가는 날~오는 날을 골라요</li><li>사다리를 타면 그 금액으로 갈 수 있는 5곳 중 한 곳이 정해져요</li></ol><p>정식 서비스에선 결제 후 진행 중일 때 취소하면 수수료가 부과될 수 있어요. 지금은 무료 베타라 결제가 없어요.</p></div>
   <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}</button>`).join('')}</div></div>
   <div class="grp"><h2>1인 예산은?</h2><label class="money"><input id="budget" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="${st.region === '국내' ? '예: 20' : '예: 80'}" value="${st.budget ? st.budget / 10000 : ''}" aria-label="1인 예산(만원 단위)"><span>만원</span></label>
     <p class="note">교통·숙박(2인 1실 기준 1인 몫)·식비를 더한 추정치로 이 금액 안에서 갈 수 있는 곳을 골라요. 실제 가격은 날짜에 따라 달라요.</p></div>
@@ -274,8 +278,7 @@ function viewPick() {
     ${nightsSel() > 0 ? `<p class="note"><b style="color:var(--ink)">${nightsSel()}박 ${nightsSel() + 1}일</b> 기준으로 비용을 셈해요.</p>` : ''}</div>
   <div class="grp"><h2>테마 <span style="font-weight:500;color:var(--sub);font-size:13px">(선택)</span></h2><div class="seg c4">${THEMES.map(t => `<button class="opt" data-theme="${t}" aria-pressed="${st.theme === t}">${t}</button>`).join('')}</div></div>
   <div class="foot"><div class="foot" id="pickfoot" style="margin-top:0">${pickFoot()}</div>
-  </div>
-  ${envList()}`;
+  </div>`; // 봉투 기능 뺌(제니 님 2026-10-30 '봉투기능빼')
 }
 function envList() {
   const e = store.get('envs', []); if (!e.length) return '';
@@ -330,9 +333,7 @@ function viewResult() {
     <div class="tags">${(d.tags || []).map(t => `<span>${esc(t)}</span>`).join('')}</div>
   </div>
   <div class="basis"><b style="color:var(--ink)">비용은 이렇게 셈했어요</b><br>${esc(d.basis)}${d.asOf ? ` (기준 ${esc(d.asOf)})` : ''}${nightsSel() && nightsSel() !== d.nights ? `<br>위 셈은 ${d.nights}박 기준이에요. 고른 ${nightsSel()}박에 맞춰 숙박은 박수만큼, 식비·현지교통은 날수만큼 늘리거나 줄인 추정치예요.` : ''}${src.length ? `<br>출처: ${src.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || s.url)}</a>`).join(' · ')}` : ''}<br>실제 가격은 날짜·예약 시점에 따라 달라요. 베타라서 예약·결제는 아직 안 돼요.</div>
-    ${st.peeked ? '<p class="note">몰래 열었어요. 출발 날까지 동행에게는 비밀이에요.</p>' : ''}
-  <button class="ghost" data-envmake>봉투에 넣기 · 출발 날 같이 열어요</button>
-  <div class="two"><button class="ghost" data-share>결과 공유하기</button><button class="ghost" data-again>다시 뽑기</button></div>
+    <div class="two"><button class="ghost" data-share>결과 공유하기</button><button class="ghost" data-again>다시 뽑기</button></div>
   ${hist.length > 1 ? `<div class="hist"><h2>지난 사다리 결과</h2><ul>${hist.slice(1, 6).map(h => `<li>${esc(h.date)} · ${esc(h.name)} (${esc(h.region)})</li>`).join('')}</ul></div>` : ''}
   <p class="note">사다리트립은 앙리스크림이 만드는 무료 베타예요. 곧 여행 상품 예약까지 한 번에 되게 준비하고 있어요.</p>`;
 }
