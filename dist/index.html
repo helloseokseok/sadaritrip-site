@@ -132,6 +132,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .dates { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; }
 .dates label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; font-weight: 700; color: var(--sub); }
 .dates input { padding: 0 10px; font-size: 15px; }
+.dates select { min-height: 52px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 14px; font: inherit; font-size: 16px; font-weight: 700; padding: 0 12px; width: 100%; }
 .dates .tilde { padding-bottom: 14px; color: var(--sub); font-weight: 700; }
 .money { display: flex; align-items: center; gap: 10px; }
 .money input { flex: 1; min-width: 0; min-height: 52px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 14px; font: inherit; font-size: 20px; font-weight: 700; padding: 0 14px; text-align: right; }
@@ -151,7 +152,7 @@ const BANDS = {
   해외: [['b1', '50만원 이하', 0, 500000], ['b2', '50~100만원', 500000, 1000000], ['b3', '100~150만원', 1000000, 1500000], ['b4', '150만원 이상', 1500000, 1e9]],
 };
 const THEMES = ['전체', '휴양', '도시', '미식'];
-const st = { step: 'pick', region: '국내', band: '', budget: 0, end: '', date: '', theme: '전체', cands: [], off: -1, rungs: [], start: -1, order: [], hit: -1, seed: '', running: false, codeOpen: false, friend: false };
+const st = { step: 'pick', region: '국내', band: '', budget: 0, end: '', from: '서울', back: '서울', date: '', theme: '전체', cands: [], off: -1, rungs: [], start: -1, order: [], hit: -1, seed: '', running: false, codeOpen: false, friend: false };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const man = n => (n >= 10000 ? Math.round(n / 10000).toLocaleString('ko-KR') + '만' : n.toLocaleString('ko-KR')) + '원';
 const store = { get(k, d) { try { const v = localStorage.getItem('sadari:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('sadari:' + k, JSON.stringify(v)); } catch (e) {} } };
@@ -162,9 +163,15 @@ const isAny = () => st.region === '아무 데나';
 // 제니 님 2026-10-30: 국내·해외만 고르고 1인 예산은 만원 단위로 직접 적어요. 옛 구간(band)·'아무 데나'는 예전 친구·봉투 코드를 열 때만 써요
 const bandLabel = () => isAny() ? '예산 상관없이' : st.band ? ((BANDS[st.region].find(b => b[0] === st.band) || [])[1] || '예산 미선택') : st.budget ? `1인 ${(st.budget / 10000).toLocaleString('ko-KR')}만원` : '예산 미입력';
 const capOf = () => { if (isAny()) return 0; if (st.band) { const b = BANDS[st.region].find(x => x[0] === st.band); return b && b[3] < 1e9 ? b[3] : 0; } return st.budget || 0; };
+// 출발·돌아오는 도시(제니 님 2026-10-30 '출발지, 도착지 사전에 정하기'): 출발 도시와 같은 도시 여행지는 후보에서 빼요.
+// 비용은 아직 서울 출발 기준이라, 다른 도시를 고르면 화면에 그렇게 알려요(도시별 요금은 사다리트립 팀이 조사 중).
+const CITIES = ['서울', '인천', '부산', '대구', '광주', '대전', '제주'];
+const CITY_DEST = { 인천: ['kr-incheon'], 부산: ['kr-busan'], 대구: ['kr-daegu'], 광주: ['kr-gwangju'], 대전: ['kr-daejeon'], 제주: ['kr-jeju', 'kr-seogwipo', 'kr-seongsan-udo', 'kr-aewol'] };
+const notFrom = d => !(CITY_DEST[st.from] || []).includes(d.id);
+const notSeoul = () => st.from !== '서울' || st.back !== '서울';
 function pool() {
   if (isAny()) return DEST.filter(d => st.theme === '전체' || (d.themes || []).includes(st.theme));
-  if (!st.band) return st.budget ? DEST.filter(d => d.region === st.region && cMin(d) <= st.budget && (st.theme === '전체' || (d.themes || []).includes(st.theme))) : [];
+  if (!st.band) return st.budget ? DEST.filter(d => d.region === st.region && notFrom(d) && cMin(d) <= st.budget && (st.theme === '전체' || (d.themes || []).includes(st.theme))) : [];
   const b = BANDS[st.region].find(x => x[0] === st.band); if (!b) return [];
   return DEST.filter(d => d.region === st.region && d.costMin < b[3] && d.costMax >= b[2] && (st.theme === '전체' || (d.themes || []).includes(st.theme)));
 }
@@ -173,7 +180,7 @@ function bandCount(region, band) { const save = [st.region, st.band]; st.region 
 function stretchPool() {
   const cap = capOf(); if (!cap) return [];
   const inP = new Set(pool().map(d => d.id));
-  const up = DEST.filter(d => d.region === st.region && !inP.has(d.id) && cMin(d) > cap && (st.theme === '전체' || (d.themes || []).includes(st.theme))).sort((x, y) => cMin(x) - cMin(y));
+  const up = DEST.filter(d => d.region === st.region && !inP.has(d.id) && notFrom(d) && cMin(d) > cap && (st.theme === '전체' || (d.themes || []).includes(st.theme))).sort((x, y) => cMin(x) - cMin(y));
   const near = up.filter(d => cMin(d) <= cap * 1.2); return near.length ? near : up.slice(0, 1); // 제니 님 2026-10-30: 후보 5곳 중 1곳은 늘 예산보다 높은 곳
 }
 const overBy = d => { const cap = capOf(); return cap && cMin(d) > cap ? cMin(d) - cap : 0; };
@@ -264,15 +271,17 @@ const cMin = d => costOf(d)[0];
 const nightLabel = d => { const n = nightsSel() || d.nights; return `${n}박 ${n + 1}일`; };
 function pickFoot() {
   const n = pool().length, N = nightsSel(), ready = st.budget > 0 && st.date && N > 0 && n >= 2;
-  const mins = DEST.filter(d => d.region === st.region && (st.theme === '전체' || (d.themes || []).includes(st.theme))).map(cMin).sort((a, b) => a - b);
+  const mins = DEST.filter(d => d.region === st.region && notFrom(d) && (st.theme === '전체' || (d.themes || []).includes(st.theme))).map(cMin).sort((a, b) => a - b);
   return `<div class="sum"><span>${esc(st.region)} · ${esc(bandLabel())} · ${st.date && N > 0 ? `${esc(st.date.slice(5).replace('-', '/'))}~${esc(st.end.slice(5).replace('-', '/'))} ${N}박` : '날짜 미선택'} · ${esc(st.theme)}</span><b>${st.budget ? `후보 ${Math.min(5, n)}곳` : ''}</b></div>
   ${st.budget && n < 2 && mins.length >= 2 ? `<p class="note">이 금액으론 갈 수 있는 곳이 부족해요. ${esc(st.region)}${st.theme === '전체' ? '' : '·' + esc(st.theme)}은 1인 약 ${man(mins[1])}부터 사다리를 탈 수 있어요.</p>` : ''}
   <button class="cta" data-ladder ${ready ? '' : 'disabled'}>사다리 타기</button>`;
 }
 function viewPick() {
   return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1></div>
-  <div class="howto"><ol><li>국내·해외, 가는 날~오는 날, 1인 예산 순서로 골라요</li><li>사다리를 타면 후보 5곳 중 한 곳이 정해져요. 5곳 중 1곳은 예산보다 조금 높은 곳이에요</li><li>정식 서비스에선 정해진 여행지의 교통편과 숙소를 자동으로 추천하고 예약해 줘요</li></ol><p>정식 서비스에선 결제 후 진행 중일 때 취소하면 수수료가 부과될 수 있어요. 지금은 무료 베타라 예약·결제가 없어요.</p></div>
+  <div class="howto"><ol><li>국내·해외, 출발·돌아오는 도시, 가는 날~오는 날, 1인 예산 순서로 골라요</li><li>사다리를 타면 후보 5곳 중 한 곳이 정해져요. 5곳 중 1곳은 예산보다 조금 높은 곳이에요</li><li>정식 서비스에선 정해진 여행지의 교통편과 숙소를 자동으로 추천하고 예약해 줘요</li></ol><p>정식 서비스에선 결제 후 진행 중일 때 취소하면 수수료가 부과될 수 있어요. 지금은 무료 베타라 예약·결제가 없어요.</p></div>
   <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}</button>`).join('')}</div></div>
+  <div class="grp"><h2>어디서 출발해서 어디로 돌아와요?</h2><div class="dates"><label><span>출발 도시</span><select id="from" aria-label="출발 도시">${CITIES.map(c => `<option${st.from === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label><span class="tilde" aria-hidden="true">→</span><label><span>돌아오는 도시</span><select id="back" aria-label="돌아오는 도시">${CITIES.map(c => `<option${st.back === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
+    ${notSeoul() ? '<p class="note">비용은 아직 서울 출발·도착 기준 추정이에요. 다른 도시 요금은 준비 중이라 교통비가 달라질 수 있어요.</p>' : ''}</div>
   <div class="grp"><h2>언제 가요?</h2><div class="dates"><label><span>가는 날</span><input type="date" id="date" min="${today()}" value="${esc(st.date)}" aria-label="가는 날"></label><span class="tilde" aria-hidden="true">~</span><label><span>오는 날</span><input type="date" id="end" min="${esc(st.date ? addDay(st.date, 1) : addDay(today(), 1))}" value="${esc(st.end)}" aria-label="오는 날"></label></div>
     ${nightsSel() > 0 ? `<p class="note"><b style="color:var(--ink)">${nightsSel()}박 ${nightsSel() + 1}일</b> 기준으로 비용을 셈해요.</p>` : ''}</div>
   <div class="grp"><h2>1인 예산은?</h2><label class="money"><input id="budget" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="${nightsSel() > 0 ? (st.region === '국내' ? '예: 20' : '예: 80') : '날짜를 먼저 골라요'}" ${nightsSel() > 0 ? '' : 'disabled'} value="${st.budget ? st.budget / 10000 : ''}" aria-label="1인 예산(만원 단위)"><span>만원</span></label>
@@ -330,10 +339,10 @@ function viewResult() {
   <div class="result">
     <div><span class="k">여행지</span><div class="big">${esc(d.name)}</div>${d.region === '해외' ? `<span class="k">${esc(d.country)}</span>` : ''}</div>
     <p class="pitch">${esc(d.pitch)}</p>
-    <div class="row"><div><span class="k">${st.end ? '일정' : '출발'}</span><b>${esc(st.date.replace(/-/g, '.'))}${st.end ? ` ~ ${esc(st.end.slice(5).replace('-', '.'))}` : ''}</b></div><div><span class="k">기간</span><b>${nightLabel(d)}</b></div><div><span class="k">1인 예상 비용</span><b>약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}</b>${overBy(d) ? `<span class="k">보너스 칸에 걸렸어요! 예산보다 ${man(overBy(d))} 더 드는 곳</span>` : ''}</div><div><span class="k">테마</span><b>${esc((d.themes || []).join('·'))}</b></div></div>
+    <div class="row"><div><span class="k">이동</span><b>${esc(st.from)} → ${esc(d.name)} → ${esc(st.back)}</b></div><div><span class="k">${st.end ? '일정' : '출발'}</span><b>${esc(st.date.replace(/-/g, '.'))}${st.end ? ` ~ ${esc(st.end.slice(5).replace('-', '.'))}` : ''}</b></div><div><span class="k">기간</span><b>${nightLabel(d)}</b></div><div><span class="k">1인 예상 비용</span><b>약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}</b>${overBy(d) ? `<span class="k">보너스 칸에 걸렸어요! 예산보다 ${man(overBy(d))} 더 드는 곳</span>` : ''}</div><div><span class="k">테마</span><b>${esc((d.themes || []).join('·'))}</b></div></div>
     <div class="tags">${(d.tags || []).map(t => `<span>${esc(t)}</span>`).join('')}</div>
   </div>
-  <div class="basis"><b style="color:var(--ink)">비용은 이렇게 셈했어요</b><br>${esc(d.basis)}${d.asOf ? ` (기준 ${esc(d.asOf)})` : ''}${nightsSel() && nightsSel() !== d.nights ? `<br>위 셈은 ${d.nights}박 기준이에요. 고른 ${nightsSel()}박에 맞춰 숙박은 박수만큼, 식비·현지교통은 날수만큼 늘리거나 줄인 추정치예요.` : ''}${src.length ? `<br>출처: ${src.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || s.url)}</a>`).join(' · ')}` : ''}<br>실제 가격은 날짜·예약 시점에 따라 달라요. 베타라서 예약·결제는 아직 안 돼요.</div>
+  <div class="basis"><b style="color:var(--ink)">비용은 이렇게 셈했어요</b><br>${esc(d.basis)}${d.asOf ? ` (기준 ${esc(d.asOf)})` : ''}${notSeoul() ? '<br>교통비는 서울 출발·도착 기준이에요. 고른 도시 요금은 준비 중이에요.' : ''}${nightsSel() && nightsSel() !== d.nights ? `<br>위 셈은 ${d.nights}박 기준이에요. 고른 ${nightsSel()}박에 맞춰 숙박은 박수만큼, 식비·현지교통은 날수만큼 늘리거나 줄인 추정치예요.` : ''}${src.length ? `<br>출처: ${src.map(s => `<a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title || s.url)}</a>`).join(' · ')}` : ''}<br>실제 가격은 날짜·예약 시점에 따라 달라요. 베타라서 예약·결제는 아직 안 돼요.</div>
     <div class="two"><button class="ghost" data-share>결과 공유하기</button><button class="ghost" data-again>다시 뽑기</button></div>
   ${hist.length > 1 ? `<div class="hist"><h2>지난 사다리 결과</h2><ul>${hist.slice(1, 6).map(h => `<li>${esc(h.date)} · ${esc(h.name)} (${esc(h.region)})</li>`).join('')}</ul></div>` : ''}
   <p class="note">사다리트립은 앙리스크림이 만드는 무료 베타예요. 곧 여행 상품 예약까지 한 번에 되게 준비하고 있어요.</p>`;
@@ -400,7 +409,7 @@ document.addEventListener('click', e => {
   if (b.hasAttribute('data-share')) {
     const d = st.order[st.hit];
     const list = st.cands.filter((_, i) => i !== st.off);
-    const txt = `사다리가 정해 줬어요 → ${d.name}${d.region === '해외' ? `(${d.country})` : ''}\n${st.date.replace(/-/g, '.')} 출발 · ${nightLabel(d)} · 1인 약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}(추정)\n후보 ${list.length}곳: ${list.map(x => x.name).join(' · ')}\nsadaritrip.com`;
+    const txt = `사다리가 정해 줬어요 (${st.from} 출발) → ${d.name}${d.region === '해외' ? `(${d.country})` : ''}\n${st.date.replace(/-/g, '.')} 출발 · ${nightLabel(d)} · 1인 약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}(추정)\n후보 ${list.length}곳: ${list.map(x => x.name).join(' · ')}\nsadaritrip.com`;
     const done = () => toast('결과를 복사했어요');
     const copy = () => { try { navigator.clipboard.writeText(txt).then(done, () => { prompt0(txt); }); } catch (err) { prompt0(txt); } };
     if (navigator.share) { navigator.share({ title: '사다리트립 결과', text: txt }).catch(err => { if (!err || err.name !== 'AbortError') copy(); }); } else copy();
@@ -409,6 +418,7 @@ document.addEventListener('click', e => {
 });
 function prompt0(txt, okMsg) { const ta = document.createElement('textarea'); ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0'; document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} ta.remove(); toast(ok ? (okMsg || '결과를 복사했어요') : '복사가 막혀 있어요. 화면을 캡처해 공유해 주세요'); }
 document.addEventListener('change', e => {
+  if (e.target.id === 'from' || e.target.id === 'back') { st[e.target.id] = e.target.value; return render(); }
   if (e.target.id === 'date') { st.date = e.target.value; if (st.end && st.end <= st.date) st.end = ''; render(); }
   if (e.target.id === 'end') { st.end = e.target.value; const N = nightsSel(); if (st.end && (N < 1 || N > 30)) { st.end = ''; toast(N < 1 ? '오는 날은 가는 날 다음 날부터 골라요' : '최대 30박까지 고를 수 있어요'); } render(); }
 });
