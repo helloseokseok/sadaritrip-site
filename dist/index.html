@@ -136,6 +136,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .money { display: flex; align-items: center; gap: 10px; }
 .money input { flex: 1; min-width: 0; min-height: 52px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink); border-radius: 14px; font: inherit; font-size: 20px; font-weight: 700; padding: 0 14px; text-align: right; }
 .money span { font-size: 17px; font-weight: 700; }
+.money input:disabled { background: var(--fill); font-size: 15px; font-weight: 500; }
 @media (prefers-reduced-motion: reduce) { .env.opening, .env.opening .flap, .env.opening .seal { animation: none; } }
 </style>
 
@@ -173,7 +174,7 @@ function stretchPool() {
   const cap = capOf(); if (!cap) return [];
   const inP = new Set(pool().map(d => d.id));
   const up = DEST.filter(d => d.region === st.region && !inP.has(d.id) && cMin(d) > cap && (st.theme === '전체' || (d.themes || []).includes(st.theme))).sort((x, y) => cMin(x) - cMin(y));
-  return up.filter(d => cMin(d) <= cap * 1.2);
+  const near = up.filter(d => cMin(d) <= cap * 1.2); return near.length ? near : up.slice(0, 1); // 제니 님 2026-10-30: 후보 5곳 중 1곳은 늘 예산보다 높은 곳
 }
 const overBy = d => { const cap = capOf(); return cap && cMin(d) > cap ? cMin(d) - cap : 0; };
 function draw(seed) {
@@ -270,12 +271,12 @@ function pickFoot() {
 }
 function viewPick() {
   return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1></div>
-  <div class="howto"><ol><li>국내·해외, 1인 예산, 가는 날~오는 날을 골라요</li><li>사다리를 타면 그 금액으로 갈 수 있는 5곳 중 한 곳이 정해져요</li></ol><p>정식 서비스에선 결제 후 진행 중일 때 취소하면 수수료가 부과될 수 있어요. 지금은 무료 베타라 결제가 없어요.</p></div>
+  <div class="howto"><ol><li>국내·해외, 가는 날~오는 날, 1인 예산 순서로 골라요</li><li>사다리를 타면 후보 5곳 중 한 곳이 정해져요. 5곳 중 1곳은 예산보다 조금 높은 곳이에요</li><li>정식 서비스에선 정해진 여행지의 교통편과 숙소를 자동으로 추천하고 예약해 줘요</li></ol><p>정식 서비스에선 결제 후 진행 중일 때 취소하면 수수료가 부과될 수 있어요. 지금은 무료 베타라 예약·결제가 없어요.</p></div>
   <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}</button>`).join('')}</div></div>
-  <div class="grp"><h2>1인 예산은?</h2><label class="money"><input id="budget" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="${st.region === '국내' ? '예: 20' : '예: 80'}" value="${st.budget ? st.budget / 10000 : ''}" aria-label="1인 예산(만원 단위)"><span>만원</span></label>
-    <p class="note">교통·숙박(2인 1실 기준 1인 몫)·식비를 더한 추정치로 이 금액 안에서 갈 수 있는 곳을 골라요. 실제 가격은 날짜에 따라 달라요.</p></div>
   <div class="grp"><h2>언제 가요?</h2><div class="dates"><label><span>가는 날</span><input type="date" id="date" min="${today()}" value="${esc(st.date)}" aria-label="가는 날"></label><span class="tilde" aria-hidden="true">~</span><label><span>오는 날</span><input type="date" id="end" min="${esc(st.date ? addDay(st.date, 1) : addDay(today(), 1))}" value="${esc(st.end)}" aria-label="오는 날"></label></div>
     ${nightsSel() > 0 ? `<p class="note"><b style="color:var(--ink)">${nightsSel()}박 ${nightsSel() + 1}일</b> 기준으로 비용을 셈해요.</p>` : ''}</div>
+  <div class="grp"><h2>1인 예산은?</h2><label class="money"><input id="budget" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="${nightsSel() > 0 ? (st.region === '국내' ? '예: 20' : '예: 80') : '날짜를 먼저 골라요'}" ${nightsSel() > 0 ? '' : 'disabled'} value="${st.budget ? st.budget / 10000 : ''}" aria-label="1인 예산(만원 단위)"><span>만원</span></label>
+    <p class="note">교통·숙박(2인 1실 기준 1인 몫)·식비를 더한 추정치로 이 금액 안에서 갈 수 있는 곳을 골라요. 실제 가격은 날짜에 따라 달라요.</p></div>
   <div class="grp"><h2>테마 <span style="font-weight:500;color:var(--sub);font-size:13px">(선택)</span></h2><div class="seg c4">${THEMES.map(t => `<button class="opt" data-theme="${t}" aria-pressed="${st.theme === t}">${t}</button>`).join('')}</div></div>
   <div class="foot"><div class="foot" id="pickfoot" style="margin-top:0">${pickFoot()}</div>
   </div>`; // 봉투 기능 뺌(제니 님 2026-10-30 '봉투기능빼')
