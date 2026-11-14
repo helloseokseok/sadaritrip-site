@@ -278,7 +278,7 @@ function pickFoot() {
 }
 function viewPick() {
   return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1></div>
-  <div class="howto"><ol><li>국내·해외, 출발·돌아오는 도시, 가는 날~오는 날, 1인 예산 순서로 골라요</li><li>사다리를 타면 후보 5곳 중 한 곳이 정해져요. 5곳 중 1곳은 예산보다 조금 높은 곳이에요</li><li>정식 서비스에선 정해진 여행지의 교통편과 숙소를 자동으로 추천하고 예약해 줘요</li></ol><p>정식 서비스에선 결제 후 진행 중일 때 취소하면 수수료가 부과될 수 있어요. 지금은 예약·결제가 없어요.</p></div>
+  <div class="howto"><ol><li>국내·해외, 출발·돌아오는 도시, 가는 날~오는 날, 1인 예산 순서로 골라요</li><li>사다리를 타면 후보 5곳 중 한 곳이 정해져요. 5곳 중 1곳은 예산보다 조금 높은 곳이에요</li><li>정식 서비스에선 정해진 여행지의 교통편과 숙소를 자동으로 추천하고 예약해 줘요</li></ol></div>
   <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}</button>`).join('')}</div></div>
   <div class="grp"><h2>어디서 출발해서 어디로 돌아와요?</h2><div class="dates"><label><span>출발 도시</span><select id="from" aria-label="출발 도시">${CITIES.map(c => `<option${st.from === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label><span class="tilde" aria-hidden="true">→</span><label><span>돌아오는 도시</span><select id="back" aria-label="돌아오는 도시">${CITIES.map(c => `<option${st.back === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
     ${notSeoul() ? '<p class="note">비용은 아직 서울 출발·도착 기준 추정이에요. 다른 도시 요금은 준비 중이라 교통비가 달라질 수 있어요.</p>' : ''}</div>
