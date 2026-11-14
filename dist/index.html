@@ -278,14 +278,12 @@ function pickFoot() {
 }
 function viewPick() {
   return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1></div>
-  <div class="howto"><ol><li>국내·해외, 출발·돌아오는 도시, 가는 날~오는 날, 1인 예산 순서로 골라요</li><li>사다리를 타면 후보 5곳 중 한 곳이 정해져요. 5곳 중 1곳은 예산보다 조금 높은 곳이에요</li></ol></div>
   <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}</button>`).join('')}</div></div>
   <div class="grp"><h2>어디서 출발해서 어디로 돌아와요?</h2><div class="dates"><label><span>출발 도시</span><select id="from" aria-label="출발 도시">${CITIES.map(c => `<option${st.from === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label><span class="tilde" aria-hidden="true">→</span><label><span>돌아오는 도시</span><select id="back" aria-label="돌아오는 도시">${CITIES.map(c => `<option${st.back === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
     ${notSeoul() ? '<p class="note">비용은 아직 서울 출발·도착 기준 추정이에요. 다른 도시 요금은 준비 중이라 교통비가 달라질 수 있어요.</p>' : ''}</div>
   <div class="grp"><h2>언제 가요?</h2><div class="dates"><label><span>가는 날</span><input type="date" id="date" min="${today()}" value="${esc(st.date)}" aria-label="가는 날"></label><span class="tilde" aria-hidden="true">~</span><label><span>오는 날</span><input type="date" id="end" min="${esc(st.date ? addDay(st.date, 1) : addDay(today(), 1))}" value="${esc(st.end)}" aria-label="오는 날"></label></div>
     ${nightsSel() > 0 ? `<p class="note"><b style="color:var(--ink)">${nightsSel()}박 ${nightsSel() + 1}일</b> 기준으로 비용을 셈해요.</p>` : ''}</div>
-  <div class="grp"><h2>1인 예산은?</h2><label class="money"><input id="budget" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="${nightsSel() > 0 ? (st.region === '국내' ? '예: 20' : '예: 80') : '날짜를 먼저 골라요'}" ${nightsSel() > 0 ? '' : 'disabled'} value="${st.budget ? st.budget / 10000 : ''}" aria-label="1인 예산(만원 단위)"><span>만원</span></label>
-    <p class="note">교통·숙박(2인 1실 기준 1인 몫)·식비를 더한 추정치로 이 금액 안에서 갈 수 있는 곳을 골라요. 실제 가격은 날짜에 따라 달라요.</p></div>
+  <div class="grp"><h2>1인 예산은?</h2><label class="money"><input id="budget" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="${nightsSel() > 0 ? (st.region === '국내' ? '예: 20' : '예: 80') : '날짜를 먼저 골라요'}" ${nightsSel() > 0 ? '' : 'disabled'} value="${st.budget ? st.budget / 10000 : ''}" aria-label="1인 예산(만원 단위)"><span>만원</span></label></div>
   <div class="grp"><h2>테마 <span style="font-weight:500;color:var(--sub);font-size:13px">(선택)</span></h2><div class="seg c4">${THEMES.map(t => `<button class="opt" data-theme="${t}" aria-pressed="${st.theme === t}">${t}</button>`).join('')}</div></div>
   <div class="foot"><div class="foot" id="pickfoot" style="margin-top:0">${pickFoot()}</div>
   </div>`; // 봉투 기능 뺌(제니 님 2026-10-30 '봉투기능빼')
