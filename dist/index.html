@@ -82,9 +82,6 @@ input[type=date] { min-height: 52px; border: 1.5px solid var(--line); background
 .basis { font-size: 12px; color: var(--sub); line-height: 1.6; background: var(--fill); border-radius: 14px; padding: 12px 14px; }
 .basis a { color: var(--ink); word-break: break-all; }
 .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.hist { display: flex; flex-direction: column; gap: 6px; }
-.hist li { font-size: 13px; color: var(--sub); }
-.hist ul { margin: 0; padding-left: 18px; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 13px; z-index: 30; }
 .empty { padding: 18px; border-radius: 14px; background: var(--fill); color: var(--sub); font-size: 14px; text-align: center; }
 button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--pt); outline-offset: 2px; }
@@ -157,6 +154,8 @@ const THEMES = ['전체', '휴양', '도시', '미식'];
 const st = { step: 'pick', region: '국내', band: '', budget: 0, end: '', from: '서울', back: '서울', date: '', theme: '전체', cands: [], off: -1, rungs: [], start: -1, order: [], hit: -1, seed: '', running: false, codeOpen: false, friend: false };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const man = n => (n >= 10000 ? Math.round(n / 10000).toLocaleString('ko-KR') + '만' : n.toLocaleString('ko-KR')) + '원';
+// 지난 사다리 결과 기록은 뺐어요(제니 님 2026-11-14) — 예전에 저장된 기록도 지워요
+try { localStorage.removeItem('sadari:hist'); } catch (e) {}
 const store = { get(k, d) { try { const v = localStorage.getItem('sadari:' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('sadari:' + k, JSON.stringify(v)); } catch (e) {} } };
 const addDay = (ymd, k) => { const d = new Date(ymd + 'T00:00:00'); d.setDate(d.getDate() + k); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
 const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
@@ -339,7 +338,6 @@ function viewLadder() {
 function viewResult() {
   const d = st.order[st.hit];
   const src = (d.src || []).filter(s => s && /^https?:\/\//.test(s.url || ''));
-  const hist = store.get('hist', []);
   return `<div class="head"><span class="step">결과</span><h1>${esc(d.name)}${(j => j && j !== 8 ? '으로' : '로')(/[가-힣]$/.test(d.name) ? (d.name.charCodeAt(d.name.length - 1) - 0xAC00) % 28 : 0)}<br>떠나요</h1></div>
   <div class="result">
     <div><span class="k">여행지</span><div class="big">${esc(d.name)}</div>${d.region === '해외' ? `<span class="k">${esc(d.country)}</span>` : ''}</div>
@@ -392,7 +390,7 @@ document.addEventListener('click', e => {
   }
   if (b.dataset.start) {
     st.start = +b.dataset.start; st.running = true; render();
-    const p = document.getElementById('lpath'), fin = () => { const list = st.cands.filter((_, i) => i !== st.off); st.hit = trace(list.length, st.L, st.start).end; st.running = false; const d = st.order[st.hit]; const h = store.get('hist', []); h.unshift({ date: st.date, name: d.name, region: d.region, seed: st.seed, at: Date.now() }); store.set('hist', h.slice(0, 20)); render(); };
+    const p = document.getElementById('lpath'), fin = () => { const list = st.cands.filter((_, i) => i !== st.off); st.hit = trace(list.length, st.L, st.start).end; st.running = false; const d = st.order[st.hit]; render(); };
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!p || reduce || !p.getTotalLength) return fin();
     const len = p.getTotalLength(), dot = document.getElementById('ldot'), pts = p.points, T = Math.min(2400, Math.max(1400, len * 2.2));
