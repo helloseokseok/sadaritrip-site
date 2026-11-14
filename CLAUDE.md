@@ -16,4 +16,5 @@
 ## 사용 기록 (대표 승인 2026-11-02)
 - `<head>`의 `/*anri-log*/` 스크립트가 익명 합계만 `https://anriscream.com/api/log`(앱 id `sadaritrip`)로 보내요: `visit`(열기), `visit_day`(이 기기 오늘 첫 방문), `visit_new`(처음 온 기기), `step`(item = env·pick·ladder·result, 화면 이동), `ladder_ride`(사다리 시작). 기기에는 날짜 표시(`anri:sadaritrip:seen`)만 남기고 서버엔 숫자만 쌓여요. 이름·연락처·IP·입력 글은 보내지 않아요.
 - 앱 함수 `go`·`startLadder`를 감싸서 기록해요(아티팩트 코드를 고치지 않음). 아티팩트에서 함수 이름이 바뀌면 그 기록만 빠지고 앱은 그대로 동작해요.
+- **운영 기기 빼기(대표 지시 2026-11-14)**: `?staff=on`으로 한 번 연 브라우저(localStorage `anri:staff`)와 자동 브라우저(`navigator.webdriver`)는 기록을 보내지 않아요. `?staff=off`로 풀어요.
 - 합계 보기: https://anriscream.com/admin/ (STATS_TOKEN).
