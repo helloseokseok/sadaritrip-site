@@ -2,6 +2,11 @@
 
 사다리트립 무료 베타 웹사이트예요. `main`에 push하면 Cloudflare Workers Builds가 sadaritrip.com에 자동 배포해요(`wrangler.jsonc`, 빌드 명령 없음, `dist/` 그대로 배포). sadaritrip.co.kr은 같은 사이트로 연결하고 페이지가 sadaritrip.com으로 넘겨요.
 
+## AI 조직 (대표 지시 2026-11-14)
+- 이 서비스는 사다리트립 사업부(trip)가 맡아요(서비스 기획·디자인·브랜딩). 본사(앙리스크림) 전략기획·개발·법무·재무팀이 같이 일해요. 규칙·순서는 anriscream-site 저장소 `docs/ORG.md`.
+- **버그는 본사 개발팀이 승인 없이 바로 고쳐요**(대표 지시 2026-11-14 "버그수정은 자동"). 기능·디자인·문구·데이터를 바꾸는 개선안은 지금처럼 제니 님 승인 뒤에.
+- 숫자는 앙리스크림 데이터센터 https://anriscream.com/admin/ 에 모여요.
+
 ## 규칙 (대표 제니 님 지시)
 - 앱을 바꾸는 일(기능·디자인·문구·데이터)은 제니 님 승인 뒤에만 해요. 원본은 Claude 아티팩트 https://claude.ai/artifact/Uc3gcV9eUVgVj3v46Vy5gz (사다리트립 사업부가 관리).
 - 무료 베타: 결제·예약을 받지 않아요(돈을 받으면 여행업 등록·통신판매업 신고가 먼저예요).
