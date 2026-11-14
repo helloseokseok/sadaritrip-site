@@ -348,7 +348,7 @@ function viewResult() {
     <div class="tags">${(d.tags || []).map(t => `<span>${esc(t)}</span>`).join('')}</div>
   </div>
     <div class="two"><button class="ghost" data-share>결과 공유하기</button><button class="ghost" data-again>다시 뽑기</button></div>
-  ${hist.length > 1 ? `<div class="hist"><h2>지난 사다리 결과</h2><ul>${hist.slice(1, 6).map(h => `<li>${esc(h.date)} · ${esc(h.name)} (${esc(h.region)})</li>`).join('')}</ul></div>` : ''}`;
+  `;
 }
 function render() {
   const v = { pick: viewPick, cands: viewCands, ladder: viewLadder, result: viewResult, env: viewEnv }[st.step]();
