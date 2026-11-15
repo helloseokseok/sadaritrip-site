@@ -138,6 +138,12 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid 
 .money span { font-size: 17px; font-weight: 700; }
 .money input:disabled { background: var(--fill); font-size: 15px; font-weight: 500; }
 @media (prefers-reduced-motion: reduce) { .env.opening, .env.opening .flap, .env.opening .seal { animation: none; } }
+.passbox { display: flex; flex-direction: column; gap: 10px; }
+.passbox img { width: 100%; height: auto; display: block; border-radius: 14px; border: 1px solid var(--line); }
+/* 김 서린 창문(승인 trip-2026-11-01-2) */
+.fogwrap { position: relative; border-radius: 22px; overflow: hidden; }
+.fogwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; transition: opacity .6s ease; }
+.fogwrap canvas.clear { opacity: 0; pointer-events: none; }
 </style>
 
 <div class="wrap" id="app"></div>
@@ -227,7 +233,7 @@ function applyEnv(raw) {
   if (!applyCode(m[1])) { st.friend = keep; return false; }
   const list = st.cands.filter((_, i) => i !== st.off), s = +m[2] - 1;
   if (s >= list.length) return false;
-  st.friend = false; st.start = s; st.hit = trace(list.length, st.L, s).end; st.env = envCode(); st.peeked = false;
+  st.friend = false; st.fog = false; st.start = s; st.hit = trace(list.length, st.L, s).end; st.env = envCode(); st.peeked = false;
   return true;
 }
 function saveEnv() {
@@ -334,22 +340,112 @@ function viewLadder() {
   </div>
   <div class="foot">${done ? `<button class="cta" data-go="result">결과 보기</button>` : ''}<button class="linkb" data-go="pick" ${st.running ? 'disabled' : ''}>조건 바꾸기</button></div>`;
 }
+function resultCard(d) {
+  return `    <div><span class="k">여행지</span><div class="big">${esc(d.name)}</div>${d.region === '해외' ? `<span class="k">${esc(d.country)}</span>` : ''}</div>
+    <p class="pitch">${esc(d.pitch)}</p>
+    <div class="row"><div><span class="k">이동</span><b>${esc(st.from)} → ${esc(d.name)} → ${esc(st.back)}</b></div><div><span class="k">${st.end ? '일정' : '출발'}</span><b>${esc(st.date.replace(/-/g, '.'))}${st.end && st.end !== st.date ? ` ~ ${esc(st.end.slice(5).replace('-', '.'))}` : ''}</b></div><div><span class="k">기간</span><b>${nightLabel(d)}</b></div><div><span class="k">1인 예상 비용</span><b>약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}</b>${overBy(d) ? `<span class="k">보너스 칸에 걸렸어요! 예산보다 ${man(overBy(d))} 더 드는 곳</span>` : ''}</div><div><span class="k">테마</span><b>${esc((d.themes || []).join('·'))}</b></div></div>
+    <div class="tags">${(d.tags || []).map(t => `<span>${esc(t)}</span>`).join('')}</div>`;
+}
 function viewResult() {
   const d = st.order[st.hit];
   const src = (d.src || []).filter(s => s && /^https?:\/\//.test(s.url || ''));
+  if (st.fog) return `<div class="head"><span class="step">결과</span><h1>창문에 김이 서렸어요</h1><p class="lead">손가락으로 문질러 닦으면 여행지가 보여요.</p></div>
+  <div class="fogwrap" id="fogwrap"><div class="result" aria-hidden="true">${resultCard(d)}</div><canvas id="fog" aria-hidden="true"></canvas></div>
+  <div class="foot"><button class="linkb" data-unfog>바로 보기</button></div>`;
   return `<div class="head"><span class="step">결과</span><h1>${esc(d.name)}${(j => j && j !== 8 ? '으로' : '로')(/[가-힣]$/.test(d.name) ? (d.name.charCodeAt(d.name.length - 1) - 0xAC00) % 28 : 0)}<br>떠나요</h1></div>
-  <div class="result">
-    <div><span class="k">여행지</span><div class="big">${esc(d.name)}</div>${d.region === '해외' ? `<span class="k">${esc(d.country)}</span>` : ''}</div>
-    <p class="pitch">${esc(d.pitch)}</p>
-    <div class="row"><div><span class="k">이동</span><b>${esc(st.from)} → ${esc(d.name)} → ${esc(st.back)}</b></div><div><span class="k">${st.end ? '일정' : '출발'}</span><b>${esc(st.date.replace(/-/g, '.'))}${st.end && st.end !== st.date ? ` ~ ${esc(st.end.slice(5).replace('-', '.'))}` : ''}</b></div><div><span class="k">기간</span><b>${nightLabel(d)}</b></div><div><span class="k">1인 예상 비용</span><b>약 ${man(costOf(d)[0])}~${man(costOf(d)[1])}</b>${overBy(d) ? `<span class="k">보너스 칸에 걸렸어요! 예산보다 ${man(overBy(d))} 더 드는 곳</span>` : ''}</div><div><span class="k">테마</span><b>${esc((d.themes || []).join('·'))}</b></div></div>
-    <div class="tags">${(d.tags || []).map(t => `<span>${esc(t)}</span>`).join('')}</div>
-  </div>
+  <div class="result">${resultCard(d)}</div>
     <div class="two"><button class="ghost" data-share>결과 공유하기</button><button class="ghost" data-again>다시 뽑기</button></div>
+  <button class="cta" data-pass>탑승권 받기</button><div id="passbox" class="passbox" hidden></div>
   `;
 }
+// 사다리 탑승권(승인 trip-2026-10-30-2): 결과를 탑승권 모양 PNG로 — 화면에서 캔버스로만 그리고 서버로 보내지 않아요. 그림 아래 글은 '비용은 추정'만(대표 지시 2026-11-15).
+const PASS_FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard Variable", Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif';
+function passCanvas() {
+  const d = st.order[st.hit], W = 1080, H = 600, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'), css = getComputedStyle(document.documentElement), v = (k, f) => (css.getPropertyValue(k) || '').trim() || f;
+  const bg = v('--card', '#FFFFFF'), ink = v('--ink', '#191F28'), sub = v('--sub', '#6B7684'), line = v('--line', '#E5E8EB'), pt = v('--pt', '#F2542D'), page = v('--bg', '#FFFFFF');
+  const F = (w, s) => `${w} ${s}px ${PASS_FONT}`;
+  const fit = (t, w, s, max) => { let z = s; g.font = F(w, z); while (z > 20 && g.measureText(t).width > max) { z -= 2; g.font = F(w, z); } return z; };
+  g.fillStyle = page; g.fillRect(0, 0, W, H);
+  const R = 36, X = 24, Y = 24, CW = W - 48, CH = H - 48, cut = 760;
+  g.fillStyle = bg; g.strokeStyle = line; g.lineWidth = 2; g.beginPath();
+  if (g.roundRect) g.roundRect(X, Y, CW, CH, R); else g.rect(X, Y, CW, CH);
+  g.fill(); g.stroke();
+  g.fillStyle = page; [Y, Y + CH].forEach(yy => { g.beginPath(); g.arc(cut, yy, 22, 0, Math.PI * 2); g.fill(); });
+  g.strokeStyle = line; g.setLineDash([10, 10]); g.beginPath(); g.moveTo(cut, Y + 30); g.lineTo(cut, Y + CH - 30); g.stroke(); g.setLineDash([]);
+  g.fillStyle = pt; g.fillRect(X + 48, Y + 44, 10, 30); g.fillRect(X + 72, Y + 44, 10, 30); g.fillRect(X + 48, Y + 55, 34, 8);
+  g.fillStyle = ink; g.font = F(800, 26); g.textBaseline = 'middle'; g.fillText('사다리트립', X + 98, Y + 60);
+  g.fillStyle = sub; g.font = F(600, 22); g.textAlign = 'right'; g.fillText('BOARDING PASS · 탑승권', cut - 40, Y + 60); g.textAlign = 'left';
+  const fromT = st.from || '서울', toT = d.name, mx = X + 48;
+  g.fillStyle = sub; g.font = F(600, 22); g.fillText('출발', mx, Y + 130); g.fillText('도착', mx + 340, Y + 130);
+  g.fillStyle = ink; fit(fromT, 800, 64, 250); g.fillText(fromT, mx, Y + 185);
+  g.fillStyle = pt; g.font = F(800, 44); g.fillText('→', mx + 262, Y + 185);
+  g.fillStyle = ink; fit(toT, 800, 64, cut - 40 - (mx + 340)); g.fillText(toT, mx + 340, Y + 185);
+  if (d.region === '해외') { g.fillStyle = sub; g.font = F(500, 22); g.fillText(d.country, mx + 340, Y + 232); }
+  const fd = s => s ? s.replace(/-/g, '.') : '-';
+  const seat = overBy(d) ? '보너스 칸' : '일반';
+  const cells = [['가는 날', fd(st.date)], ['오는 날', fd(st.end)], ['편명', 'LADDER ' + (st.start + 1)], ['좌석', seat], ['기간', nightLabel(d)], ['돌아오는 곳', st.back || '서울']];
+  cells.forEach(([k, val], i) => { const cx = mx + (i % 3) * 230, cy = Y + 300 + Math.floor(i / 3) * 96; g.fillStyle = sub; g.font = F(600, 20); g.fillText(k, cx, cy); g.fillStyle = k === '좌석' && seat === '보너스 칸' ? pt : ink; fit(val, 800, 30, 210); g.fillText(val, cx, cy + 38); });
+  g.fillStyle = sub; g.font = F(500, 18); g.fillText('비용은 추정', mx, Y + CH - 34);
+  const list = st.cands.filter((_, i) => i !== st.off), n = list.length, L = st.L, sx = cut + 40, sw = X + CW - 40 - sx, sy = Y + 110, sh = CH - 200;
+  g.fillStyle = sub; g.font = F(600, 20); g.fillText('사다리 바코드', sx, Y + 72);
+  if (L && n > 1) {
+    const px = col => sx + (col + 0.5) * sw / n, py = r => sy + (r + 0.5) * sh / L.rows;
+    g.strokeStyle = line; g.lineWidth = 6; g.lineCap = 'round';
+    for (let i = 0; i < n; i++) { g.beginPath(); g.moveTo(px(i), sy); g.lineTo(px(i), sy + sh); g.stroke(); }
+    L.rungs.forEach(([r, col]) => { g.beginPath(); g.moveTo(px(col), py(r)); g.lineTo(px(col + 1), py(r)); g.stroke(); });
+    if (L.mine) { g.save(); g.strokeStyle = pt; g.globalAlpha = .55; g.beginPath(); g.moveTo(px(L.mine[1]), py(L.mine[0])); g.lineTo(px(L.mine[1] + 1), py(L.mine[0])); g.stroke(); g.restore(); }
+    const tr = trace(n, L, st.start); g.strokeStyle = pt; g.lineWidth = 8; g.lineJoin = 'round'; g.beginPath();
+    tr.pts.forEach(([col, r], i) => { const yy = Math.max(sy, Math.min(sy + sh, py(r))); i ? g.lineTo(px(col), yy) : g.moveTo(px(col), yy); }); g.stroke();
+    g.fillStyle = pt; g.beginPath(); g.arc(px(tr.end), sy + sh, 10, 0, Math.PI * 2); g.fill();
+  }
+  g.fillStyle = ink; g.textAlign = 'center'; fit(toT, 800, 30, sw); g.fillText(toT, sx + sw / 2, Y + CH - 40); g.textAlign = 'left';
+  return c;
+}
+function makePass() {
+  const box = document.getElementById('passbox'); if (!box) return;
+  let c; try { c = passCanvas(); } catch (e) { toast('탑승권을 만들지 못했어요'); return; }
+  st.passUrl = c.toDataURL('image/png');
+  box.innerHTML = `<img src="${st.passUrl}" alt="${esc(st.order[st.hit].name)}행 사다리 탑승권 이미지"><div class="two"><button class="ghost" data-passshare>공유하기</button><button class="ghost" data-passsave>저장</button></div>`;
+  box.hidden = false; box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function passFile() { const u = st.passUrl || '', bin = atob(u.split(',')[1] || ''), a = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return new File([a], 'sadaritrip-boarding-pass.png', { type: 'image/png' }); }
+function sharePass() {
+  if (!st.passUrl) return makePass();
+  let f = null; try { f = passFile(); } catch (e) {}
+  if (f && navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: '사다리트립 탑승권', text: '사다리가 정해 줬어요 → ' + st.order[st.hit].name + ' · sadaritrip.com' }).catch(err => { if (!err || err.name !== 'AbortError') savePass(); }); }
+  else savePass();
+}
+function savePass() {
+  if (!st.passUrl) return makePass();
+  toast('위 이미지를 길게 누르거나(휴대폰) 오른쪽 클릭해(PC) 저장해 주세요');
+}
 function render() {
+  if (st.fog && st.step === 'result' && window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) st.fog = false;
   const v = { pick: viewPick, cands: viewCands, ladder: viewLadder, result: viewResult, env: viewEnv }[st.step]();
   document.getElementById('app').innerHTML = `<div class="top"><button class="logo" data-home aria-label="사다리트립 처음으로"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="7" y="3" width="4" height="26" rx="2" fill="currentColor"/><rect x="21" y="3" width="4" height="26" rx="2" fill="currentColor"/><rect x="9" y="9" width="14" height="3.5" rx="1.7" fill="#F2542D"/><rect x="9" y="19" width="14" height="3.5" rx="1.7" fill="#F2542D"/></svg>사다리트립</button></div>` + v;
+  if (st.step === 'result' && st.fog) initFog();
+}
+// 김 서린 창문: 결과 카드 위 캔버스에 김을 칠하고, 문지른 자리만 지워요. 40% 넘게 닦이면 나머지가 걷혀요. 돈·경품 없음.
+function initFog() {
+  const w = document.getElementById('fogwrap'), c = document.getElementById('fog'); if (!w || !c) return;
+  const r = w.getBoundingClientRect(), W = Math.max(1, Math.round(r.width)), H = Math.max(1, Math.round(r.height));
+  c.width = W; c.height = H; const g = c.getContext('2d'); if (!g) { st.fog = false; return render(); }
+  const dark = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toUpperCase() === '#000000';
+  g.fillStyle = dark ? 'rgb(78,78,82)' : 'rgb(214,218,224)'; g.fillRect(0, 0, W, H);
+  const rr = rng(st.seed + ':fog'); g.fillStyle = dark ? 'rgba(255,255,255,.06)' : 'rgba(255,255,255,.35)';
+  for (let i = 0; i < 70; i++) { g.beginPath(); g.arc(rr() * W, rr() * H, 1 + rr() * 3, 0, Math.PI * 2); g.fill(); }
+  g.fillStyle = dark ? 'rgba(242,242,247,.75)' : 'rgba(25,31,40,.55)'; g.font = '700 17px ' + PASS_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('창문을 닦아 보세요', W / 2, H / 2);
+  g.globalCompositeOperation = 'destination-out'; g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = 46;
+  let last = null, n = 0, done = false;
+  const pt = e => { const b = c.getBoundingClientRect(); return [(e.clientX - b.left) * W / b.width, (e.clientY - b.top) * H / b.height]; };
+  const cleared = () => { const im = g.getImageData(0, 0, W, H).data; let k = 0, t = 0; for (let i = 3; i < im.length; i += 4 * 7) { t++; if (im[i] < 40) k++; } return t ? k / t : 1; };
+  const reveal = () => { if (done) return; done = true; c.classList.add('clear'); if (navigator.vibrate) { try { navigator.vibrate([10, 30, 18]); } catch (e) {} } setTimeout(() => { st.fog = false; render(); }, 620); };
+  const wipe = e => { const p = pt(e); g.beginPath(); if (last) { g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); } else { g.arc(p[0], p[1], 23, 0, Math.PI * 2); g.fill(); } last = p; if (++n % 6 === 0 && cleared() >= 0.4) reveal(); };
+  c.addEventListener('pointerdown', e => { last = null; try { c.setPointerCapture(e.pointerId); } catch (err) {} wipe(e); });
+  c.addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'touch') wipe(e); });
+  const up = () => { last = null; if (!done && cleared() >= 0.4) reveal(); };
+  c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
 }
 function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 1800); }
 function go(step) { st.step = step; render(); window.scrollTo(0, 0); }
@@ -389,7 +485,7 @@ document.addEventListener('click', e => {
   }
   if (b.dataset.start) {
     st.start = +b.dataset.start; st.running = true; render();
-    const p = document.getElementById('lpath'), fin = () => { const list = st.cands.filter((_, i) => i !== st.off); st.hit = trace(list.length, st.L, st.start).end; st.running = false; const d = st.order[st.hit]; render(); };
+    const p = document.getElementById('lpath'), fin = () => { const list = st.cands.filter((_, i) => i !== st.off); st.hit = trace(list.length, st.L, st.start).end; st.running = false; st.fog = true; const d = st.order[st.hit]; render(); };
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!p || reduce || !p.getTotalLength) return fin();
     const len = p.getTotalLength(), dot = document.getElementById('ldot'), pts = p.points, T = Math.min(2400, Math.max(1400, len * 2.2));
@@ -406,6 +502,10 @@ document.addEventListener('click', e => {
     requestAnimationFrame(step); setTimeout(() => { if (!ended) { ended = true; fin(); } }, T + 1500); return;
   }
   if (b.hasAttribute('data-again')) { if (isAny()) st.region = '국내'; st.band = ''; draw(); st.friend = false; st.peeked = false; startLadder(); return go('ladder'); }
+  if (b.hasAttribute('data-unfog')) { const c = document.getElementById('fog'); if (c) c.classList.add('clear'); setTimeout(() => { st.fog = false; render(); }, c ? 400 : 0); return; }
+  if (b.hasAttribute('data-pass')) { makePass(); return; }
+  if (b.hasAttribute('data-passshare')) { sharePass(); return; }
+  if (b.hasAttribute('data-passsave')) { savePass(); return; }
   if (b.hasAttribute('data-share')) {
     const d = st.order[st.hit];
     const list = st.cands.filter((_, i) => i !== st.off);
