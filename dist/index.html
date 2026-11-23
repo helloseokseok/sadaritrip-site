@@ -42,6 +42,12 @@ input[type=date] { min-height: 52px; border: 1.5px solid var(--line); background
 .sum b { color: var(--ink); white-space: nowrap; }
 .cta { min-height: 56px; border: 0; border-radius: 16px; background: var(--pt); color: #fff; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; width: 100%; }
 .cta:disabled { opacity: .45; cursor: default; }
+.quick { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 12px 16px; border: 1.5px solid var(--pt); background: var(--pt-soft); color: var(--pt-ink); border-radius: 16px; font: inherit; text-align: left; cursor: pointer; }
+.quick b { display: block; font-size: 16px; font-weight: 800; }
+.quick small { display: block; font-size: 12.5px; font-weight: 500; opacity: .85; margin-top: 2px; }
+.quick i { font-style: normal; font-size: 22px; line-height: 1; }
+.or { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 12px; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .ghost { min-height: 48px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; }
 .linkb { border: 0; background: none; color: var(--sub); font: inherit; font-size: 14px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 44px; }
 .foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
@@ -288,8 +294,13 @@ function pickFoot() {
   ${st.budget && n < 2 && mins.length >= 2 ? `<p class="note">이 금액으론 갈 수 있는 곳이 부족해요. ${esc(st.region)}${st.theme === '전체' ? '' : '·' + esc(st.theme)}은 1인 약 ${man(mins[1])}부터 사다리를 탈 수 있어요.</p>` : ''}
   <button class="cta" data-ladder ${ready ? '' : 'disabled'}>사다리 타기</button>`;
 }
+// 바로 타기(대표 승인 2026-11-24 경쟁사 분석 '다음 할 일' ④ — 7일 열기 24번에 사다리 0번, 첫 화면 조건 넷을 다 채워야 버튼이 켜져서): 국내 · 다가오는 토~일 1박 · 1인 30만 원으로 바로 사다리
+function quickDates() { const d = new Date(today() + 'T00:00:00'), w = d.getDay(); d.setDate(d.getDate() + ((6 - w + 7) % 7 || (w === 6 ? 0 : 7))); const f = x => { const y = new Date(x.getTime() - x.getTimezoneOffset() * 60000); return y.toISOString().slice(0, 10); }; const e = new Date(d); e.setDate(e.getDate() + 1); return [f(d), f(e)]; }
+function quickLabel() { const [a] = quickDates(); return a.slice(5).replace('-', '/') + '(토)'; }
 function viewPick() {
   return `<div class="head"><span class="step">1 / 2 · 조건 고르기</span><h1>어디 갈지는<br>사다리가 정해요</h1></div>
+  <button class="quick" data-quick><i aria-hidden="true">⚡</i><span><b>고민 없이 바로 타기</b><small>국내 · ${esc(quickLabel())} 1박 2일 · 1인 30만 원</small></span></button>
+  <div class="or">또는 직접 고르기</div>
   <div class="grp"><h2>어디로 갈까요?</h2><div class="seg c2">${['국내', '해외'].map(r => `<button class="opt" data-region="${r}" aria-pressed="${st.region === r}">${r}</button>`).join('')}</div></div>
   <div class="grp"><h2>어디서 출발해서 어디로 돌아와요?</h2><div class="dates"><label><span>출발 도시</span><select id="from" aria-label="출발 도시">${CITIES.map(c => `<option${st.from === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label><span class="tilde" aria-hidden="true">→</span><label><span>돌아오는 도시</span><select id="back" aria-label="돌아오는 도시">${CITIES.map(c => `<option${st.back === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
     ${notSeoul() ? '<p class="note">비용은 아직 서울 출발·도착 기준 추정이에요. 다른 도시 요금은 준비 중이라 교통비가 달라질 수 있어요.</p>' : ''}</div>
@@ -470,6 +481,7 @@ document.addEventListener('click', e => {
     if (navigator.share) { navigator.share({ title: '사다리트립 비밀 봉투', text: txt }).catch(err => { if (!err || err.name !== 'AbortError') prompt0(txt, '봉투 코드를 복사했어요'); }); } else { try { navigator.clipboard.writeText(txt).then(() => toast('봉투 코드를 복사했어요'), () => prompt0(txt, '봉투 코드를 복사했어요')); } catch (err) { prompt0(txt, '봉투 코드를 복사했어요'); } }
     return;
   }
+  if (b.hasAttribute('data-quick')) { const [a, e2] = quickDates(); st.region = '국내'; st.band = ''; st.theme = '전체'; st.date = a; st.end = e2; st.budget = 300000; if (pool().length < 2) { render(); return toast('조건을 직접 골라 주세요'); } try { window.anriLog && anriLog('quick'); } catch (err) {} draw(); st.friend = false; st.peeked = false; startLadder(); return go('ladder'); }
   if (b.hasAttribute('data-ladder')) { draw(); st.friend = false; st.peeked = false; startLadder(); return go('ladder'); }
   if (b.dataset.region) { st.region = b.dataset.region; st.band = ''; if (st.region === '해외' && isDay()) { st.end = ''; toast('해외는 1박부터 골라요'); } return render(); }
   if (b.dataset.band) { st.band = b.dataset.band; return render(); }
